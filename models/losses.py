@@ -6,7 +6,14 @@ import tensorflow as tf
 from tensorflow.python.keras import backend as K
 
 
-def SSDLoss(alpha=1., pos_neg_ratio=3.):
+def SSDLoss(alpha=1., pos_neg_ratio=3., verbose=True):
+    """
+    Original Loss Function Using Hard Negative Sampling
+
+    :param alpha:
+    :param pos_neg_ratio:
+    :return:
+    """
     def ssd_loss(y_true, y_pred):
         num_classes = tf.shape(y_true)[2] - 4
         y_true = tf.reshape(y_true, [-1, num_classes + 4])
@@ -45,5 +52,50 @@ def SSDLoss(alpha=1., pos_neg_ratio=3.):
         loc_loss = tf.reduce_sum(loc_loss * pos_mask) / (num_pos + eps)
 
         # total loss
+        if verbose:
+            clf_loss = K.print_tensor(clf_loss, message='clf_loss : ')
+            loc_loss = K.print_tensor(loc_loss, message='loc_loss : ')
         return clf_loss + alpha * loc_loss
     return ssd_loss
+
+
+def FocalLoss(gamma=2., alpha=0.25, verbose=True):
+    def focal_loss(y_true, y_pred):
+        num_classes = tf.shape(y_true)[2] - 4
+        y_true = tf.reshape(y_true, [-1, num_classes + 4])
+        y_pred = tf.reshape(y_pred, [-1, num_classes + 4])
+        eps = K.epsilon()
+
+        # Split Classification and Localization output
+        y_true_clf, y_true_loc = tf.split(y_true, [num_classes, 4], axis=-1)
+        y_pred_clf, y_pred_loc = tf.split(y_pred, [num_classes, 4], axis=-1)
+
+        # split foreground & background
+        neg_mask = y_true_clf[:, -1]
+        pos_mask = 1 - neg_mask
+        num_pos = tf.reduce_sum(pos_mask)
+
+        # focal loss
+        y_pred_clf = K.clip(y_pred_clf, eps, 1. - eps)
+        pt = tf.where(tf.equal(y_true_clf, 1.),
+                      y_pred_clf,
+                      1. - y_pred_clf)
+        clf_loss = - alpha * (1.-pt)**gamma * tf.log(pt)
+        clf_loss = tf.reduce_sum(clf_loss, axis=-1)
+        clf_loss = tf.reduce_mean(clf_loss)
+
+        # smooth l1 loss
+        l1_loss = tf.abs(y_true_loc - y_pred_loc)
+        l2_loss = 0.5 * (y_true_loc - y_pred_loc) ** 2
+        loc_loss = tf.where(tf.less(l1_loss, 1.0),
+                            l2_loss,
+                            l1_loss - 0.5)
+        loc_loss = tf.reduce_sum(loc_loss, axis=-1)
+        loc_loss = tf.reduce_sum(loc_loss * pos_mask) / (num_pos + eps)
+
+        # total loss
+        if verbose:
+            clf_loss = K.print_tensor(clf_loss, message='clf_loss : ')
+            loc_loss = K.print_tensor(loc_loss, message='loc_loss : ')
+        return clf_loss + loc_loss
+    return focal_loss

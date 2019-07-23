@@ -8,9 +8,16 @@ from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.layers import Concatenate, Reshape
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
+from .normalization import GroupNormalization
+from functools import partial
 
 
-def build_base_network(input_shape=(None,None,3), num_units=16):
+def build_base_network(input_shape=(None,None,3), num_units=16, use_group_norm=False):
+    if use_group_norm:
+        Normalization = partial(GroupNormalization, groups=num_units)
+    else:
+        Normalization = BatchNormalization
+
     K.clear_session()
 
     inputs = Input(shape=input_shape)
@@ -18,45 +25,45 @@ def build_base_network(input_shape=(None,None,3), num_units=16):
     # BLOCK 1
     conv1_1 = Conv2D(num_units, (3, 3), strides=(1, 1), activation='relu',
                      padding='same', name='conv1_1')(inputs)
-    norm1_1 = BatchNormalization(name='norm1_1')(conv1_1)
+    norm1_1 = Normalization(name='norm1_1')(conv1_1)
     conv1_2 = Conv2D(num_units, (3, 3), strides=(1, 1), activation='relu',
                      padding='same', name='conv1_2')(norm1_1)
-    norm1_2 = BatchNormalization(name='norm1_2')(conv1_2)
+    norm1_2 = Normalization(name='norm1_2')(conv1_2)
     conv1_3 = Conv2D(num_units, (3, 3), strides=(1, 1), activation='relu',
                      padding='same', name='conv1_3')(norm1_2)
-    norm1_3 = BatchNormalization(name='norm1_3')(conv1_3)
+    norm1_3 = Normalization(name='norm1_3')(conv1_3)
 
     # BLOCK 2
     conv2_1 = Conv2D(num_units * 2, (3, 3), activation='relu',
                      padding='same', name='conv2_1')(norm1_3)
-    norm2_1 = BatchNormalization(name='norm2_1')(conv2_1)
+    norm2_1 = Normalization(name='norm2_1')(conv2_1)
     conv2_2 = Conv2D(num_units * 2, (3, 3), strides=(2, 2), activation='relu',
                      padding='same', name='conv2_2')(norm2_1)
-    norm2_2 = BatchNormalization(name='norm2_2')(conv2_2)
+    norm2_2 = Normalization(name='norm2_2')(conv2_2)
 
     # BLOCK 3
     conv3_1 = Conv2D(num_units * 4, (3, 3), activation='relu',
                      padding='same', name='conv3_1')(norm2_2)
-    norm3_1 = BatchNormalization(name='norm3_1')(conv3_1)
+    norm3_1 = Normalization(name='norm3_1')(conv3_1)
     conv3_2 = Conv2D(num_units * 4, (3, 3), strides=(2, 2), activation='relu',
                      padding='same', name='conv3_2')(norm3_1)
-    norm3_2 = BatchNormalization(name='norm3_2')(conv3_2)
+    norm3_2 = Normalization(name='norm3_2')(conv3_2)
 
     # BLOCK 4
     conv4_1 = Conv2D(num_units * 8, (3, 3), activation='relu',
                      padding='same', name='conv4_skip')(norm3_2)
-    norm4_1 = BatchNormalization(name='norm4_1')(conv4_1)
+    norm4_1 = Normalization(name='norm4_1')(conv4_1)
     conv4_2 = Conv2D(num_units * 8, (3, 3), strides=(2, 2), activation='relu',
                      padding='same', name='conv4_2')(norm4_1)
-    norm4_2 = BatchNormalization(name='norm4_2')(conv4_2)
+    norm4_2 = Normalization(name='norm4_2')(conv4_2)
 
     # Block 5
     conv5_1 = Conv2D(num_units * 8, (3, 3), activation='relu',
                      padding='same', name='conv5_skip')(norm4_2)
-    norm5_1 = BatchNormalization(name='norm5_1')(conv5_1)
+    norm5_1 = Normalization(name='norm5_1')(conv5_1)
     conv5_2 = Conv2D(num_units * 8, (3, 3), strides=(2, 2), activation='relu',
                      padding='same', name='conv5_2')(norm5_1)
-    norm5_2 = BatchNormalization(name='norm5_2')(conv5_2)
+    norm5_2 = Normalization(name='norm5_2')(conv5_2)
 
     outputs = norm5_2
 
