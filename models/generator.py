@@ -28,8 +28,8 @@ class PriorBoxes:
             ys, xs = np.mgrid[0:height:stride, 0:width:stride]
             box_width = np.ones_like(xs) * box_width
             box_height = np.ones_like(ys) * box_height
-            center_xs = box_width // 2 + xs
-            center_ys = box_height // 2 + ys
+            center_xs = stride // 2 + xs
+            center_ys = stride // 2 + ys
 
             block_centers = np.stack((center_xs, center_ys,
                                       box_width, box_height),
