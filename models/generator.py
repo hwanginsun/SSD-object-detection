@@ -25,7 +25,7 @@ class PriorBoxes:
         centers = []
         for idx, row in self.bbox_df.iterrows():
             stride, box_width, box_height = row.stride, row.w, row.h
-            ys, xs = np.mgrid[0:height:stride, 0:width:stride]
+            xs, ys = np.mgrid[0:height:stride, 0:width:stride]
             box_width = np.ones_like(xs) * box_width
             box_height = np.ones_like(ys) * box_height
             center_xs = stride // 2 + xs
