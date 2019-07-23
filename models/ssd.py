@@ -79,7 +79,7 @@ def attach_multibox_head(base_network, source_layer_names,
         source_layer = base_network.get_layer(layer_name).output
 
         # Classification
-        clf = Conv2D(num_priors * (num_classes+1), (3,3),
+        clf = Conv2D(num_priors * (num_classes+1), (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
         clf = Reshape((-1, num_classes+1),
                       name=f'clf_head{idx}_reshape')(clf)

@@ -21,11 +21,17 @@ class PriorBoxes:
         self.setup()
 
     def generate(self, image_shape):
+        """
+        image_shape에 맞춰서, Prior Box(==Default Boxes)를 구성
+
+        return :
+        (# Prior boxes, 4)로 이루어진 출력값 생성
+        """
         height, width = image_shape[:2]
         centers = []
         for idx, row in self.bbox_df.iterrows():
             stride, box_width, box_height = row.stride, row.w, row.h
-            xs, ys = np.mgrid[0:height:stride, 0:width:stride]
+            ys, xs = np.mgrid[0:height:stride, 0:width:stride]
             box_width = np.ones_like(xs) * box_width
             box_height = np.ones_like(ys) * box_height
             center_xs = stride // 2 + xs
@@ -39,16 +45,15 @@ class PriorBoxes:
         return np.concatenate(centers, axis=0)
 
     def setup(self):
-        bbox_df = pd.DataFrame(columns=['stride', 'scale', 'ratio', 'w', 'h'])
+        bbox_df = pd.DataFrame(columns=['stride', 'scale', 'w', 'h'])
         for scale, stride in zip(self.scales, self.strides):
             for ratio in self.ratios:
-                w = np.round(scale * np.sqrt(ratio)).astype(np.int)
-                h = np.round(scale / np.sqrt(ratio)).astype(np.int)
-                bbox_df.loc[len(bbox_df) + 1] = [stride, scale, ratio, w, h]
+                w = np.round(scale * ratio[0]).astype(np.int)
+                h = np.round(scale * ratio[1]).astype(np.int)
+                bbox_df.loc[len(bbox_df) + 1] = [stride, scale, w, h]
 
         bbox_df.stride = bbox_df.stride.astype(np.int)
         bbox_df.scale = bbox_df.scale.astype(np.int)
-        bbox_df.ratio = bbox_df.ratio.astype(np.float)
         bbox_df.w = bbox_df.w.astype(np.int)
         bbox_df.h = bbox_df.h.astype(np.int)
         self.bbox_df = bbox_df
