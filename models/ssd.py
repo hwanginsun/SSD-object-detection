@@ -8,6 +8,7 @@ from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.layers import Concatenate, Reshape
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.layers import Softmax
 from .normalization import GroupNormalization
 from functools import partial
 
@@ -79,10 +80,10 @@ def attach_multibox_head(base_network, source_layer_names,
 
         # Classification
         clf = Conv2D(num_priors * (num_classes+1), (3,3),
-                     activation='softmax', padding='same',
-                     name=f'clf_head{idx}')(source_layer)
+                     padding='same', name=f'clf_head{idx}_logit')(source_layer)
         clf = Reshape((-1, num_classes+1),
                       name=f'clf_head{idx}_reshape')(clf)
+        clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
         clf_heads.append(clf)
 
         # Localization
