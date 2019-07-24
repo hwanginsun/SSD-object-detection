@@ -45,15 +45,14 @@ class PriorBoxes:
         return np.concatenate(centers, axis=0)
 
     def setup(self):
-        bbox_df = pd.DataFrame(columns=['stride', 'scale', 'w', 'h'])
+        bbox_df = pd.DataFrame(columns=['stride', 'w', 'h'])
         for scale, stride in zip(self.scales, self.strides):
             for ratio in self.ratios:
                 w = np.round(scale * ratio[0]).astype(np.int)
                 h = np.round(scale * ratio[1]).astype(np.int)
-                bbox_df.loc[len(bbox_df) + 1] = [stride, scale, w, h]
+                bbox_df.loc[len(bbox_df) + 1] = [stride, w, h]
 
         bbox_df.stride = bbox_df.stride.astype(np.int)
-        bbox_df.scale = bbox_df.scale.astype(np.int)
         bbox_df.w = bbox_df.w.astype(np.int)
         bbox_df.h = bbox_df.h.astype(np.int)
         self.bbox_df = bbox_df
@@ -85,19 +84,27 @@ class DetectionGenerator(Sequence):
 
         y_true = []
         for index, gt_df in ground_truths.groupby('image_index'):
-            gt_boxes = gt_df.iloc[:, 1:5].values
-            gt_labels = gt_df.iloc[:, -1].values
+
+            gt_boxes = gt_df[['cx', 'cy', 'w', 'h']].values
+            gt_labels = gt_df['label'].values
             iou = calculate_iou(gt_boxes, pr_boxes)
 
             match_indices = np.argwhere(iou >= self.iou_threshold)
+            gt_match_indices = match_indices[:, 0]
+            pr_match_indices = match_indices[:, 1]
 
-            y_true_clf = np.ones((pr_boxes.shape[0])) * self.num_classes  # Background로 일단 채움
-            y_true_clf[match_indices[:, 1]] = gt_labels[match_indices[:, 0]]
+            # Background로 일단 채움
+            y_true_clf = np.ones((pr_boxes.shape[0])) * self.num_classes
+            y_true_clf[pr_match_indices] = gt_labels[gt_match_indices]
 
-            y_true_clf = to_categorical(y_true_clf, num_classes=self.num_classes + 1)  # One-Hot Encoding
+            # classification One-Hot Encoding
+            y_true_clf = to_categorical(y_true_clf,
+                                        num_classes=self.num_classes + 1)
+
+            # Positional Information Encoding
             y_true_loc = np.zeros((pr_boxes.shape[0], 4))
-            g_cx, g_cy, g_w, g_h = gt_boxes[match_indices[:, 0]].transpose()
-            p_cx, p_cy, p_w, p_h = pr_boxes[match_indices[:, 1]].transpose()
+            g_cx, g_cy, g_w, g_h = gt_boxes[gt_match_indices].transpose()
+            p_cx, p_cy, p_w, p_h = pr_boxes[pr_match_indices].transpose()
 
             hat_g_cx = (g_cx - p_cx) / p_w
             hat_g_cy = (g_cy - p_cy) / p_h
@@ -105,8 +112,11 @@ class DetectionGenerator(Sequence):
             hat_g_h = np.log(g_h / p_h)
 
             hat_g = np.stack([hat_g_cx, hat_g_cy, hat_g_w, hat_g_h], axis=1)
-            y_true_loc[match_indices[:, 1]] = hat_g
-            y_true.append(np.concatenate([y_true_clf, y_true_loc], axis=1))
+            y_true_loc[pr_match_indices] = hat_g
+
+            y_true_head = np.concatenate([y_true_clf, y_true_loc], axis=1)
+
+            y_true.append(y_true_head)
 
         return images, np.stack(y_true)
 

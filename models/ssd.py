@@ -5,6 +5,7 @@ Mail : rocketgrowthsj@gmail.com
 from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.layers import Conv2D
 from tensorflow.python.keras.layers import BatchNormalization
+from tensorflow.python.keras.layers import ZeroPadding2D
 from tensorflow.python.keras.layers import Concatenate, Reshape
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
@@ -38,32 +39,36 @@ def build_base_network(input_shape=(None,None,3), num_units=16, use_group_norm=F
     conv2_1 = Conv2D(num_units * 2, (3, 3), activation='relu',
                      padding='same', name='conv2_1')(norm1_3)
     norm2_1 = Normalization(name='norm2_1')(conv2_1)
+    norm2_1 = ZeroPadding2D((1,1))(norm2_1)
     conv2_2 = Conv2D(num_units * 2, (3, 3), strides=(2, 2), activation='relu',
-                     padding='same', name='conv2_2')(norm2_1)
+                     padding='valid', name='conv2_2')(norm2_1)
     norm2_2 = Normalization(name='norm2_2')(conv2_2)
 
     # BLOCK 3
     conv3_1 = Conv2D(num_units * 4, (3, 3), activation='relu',
                      padding='same', name='conv3_1')(norm2_2)
     norm3_1 = Normalization(name='norm3_1')(conv3_1)
+    norm3_1 = ZeroPadding2D((1,1))(norm3_1)
     conv3_2 = Conv2D(num_units * 4, (3, 3), strides=(2, 2), activation='relu',
-                     padding='same', name='conv3_2')(norm3_1)
+                     padding='valid', name='conv3_2')(norm3_1)
     norm3_2 = Normalization(name='norm3_2')(conv3_2)
 
     # BLOCK 4
     conv4_1 = Conv2D(num_units * 8, (3, 3), activation='relu',
                      padding='same', name='conv4_skip')(norm3_2)
     norm4_1 = Normalization(name='norm4_1')(conv4_1)
+    norm4_1 = ZeroPadding2D((1, 1))(norm4_1)
     conv4_2 = Conv2D(num_units * 8, (3, 3), strides=(2, 2), activation='relu',
-                     padding='same', name='conv4_2')(norm4_1)
+                     padding='valid', name='conv4_2')(norm4_1)
     norm4_2 = Normalization(name='norm4_2')(conv4_2)
 
     # Block 5
     conv5_1 = Conv2D(num_units * 8, (3, 3), activation='relu',
                      padding='same', name='conv5_skip')(norm4_2)
     norm5_1 = Normalization(name='norm5_1')(conv5_1)
+    norm5_1 = ZeroPadding2D((1, 1))(norm5_1)
     conv5_2 = Conv2D(num_units * 8, (3, 3), strides=(2, 2), activation='relu',
-                     padding='same', name='conv5_2')(norm5_1)
+                     padding='valid', name='conv5_2')(norm5_1)
     norm5_2 = Normalization(name='norm5_2')(conv5_2)
 
     outputs = norm5_2
@@ -72,9 +77,8 @@ def build_base_network(input_shape=(None,None,3), num_units=16, use_group_norm=F
 
 
 def attach_multibox_head(base_network, source_layer_names,
-                         num_priors=3, num_classes=10):
-    clf_heads = []
-    loc_heads = []
+                         num_priors=4, num_classes=10):
+    heads = []
     for idx, layer_name in enumerate(source_layer_names):
         source_layer = base_network.get_layer(layer_name).output
 
@@ -84,17 +88,14 @@ def attach_multibox_head(base_network, source_layer_names,
         clf = Reshape((-1, num_classes+1),
                       name=f'clf_head{idx}_reshape')(clf)
         clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
-        clf_heads.append(clf)
 
         # Localization
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
                      name=f'loc_head{idx}')(source_layer)
         loc = Reshape((-1,4),
                       name=f'loc_head{idx}_reshape')(loc)
-        loc_heads.append(loc)
+        head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
+        heads.append(head)
 
-    clf_concat = Concatenate(axis=1, name='clf_heads_concat')(clf_heads)
-    loc_concat = Concatenate(axis=1, name='loc_heads_concat')(loc_heads)
-    predictions = Concatenate(axis=-1, name='predictions')([clf_concat,
-                                                            loc_concat])
+    predictions = Concatenate(axis=1, name='predictions')(heads)
     return predictions
