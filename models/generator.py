@@ -131,40 +131,44 @@ class DetectionGenerator(Sequence):
             self.dataset.shuffle()
 
 
-def calculate_iou(gt_boxes, pr_boxes):
-    exp_gt_boxes = gt_boxes[:, None]  # Ground truth box가 행 기준으로 정렬되도록
-    exp_pr_boxes = pr_boxes[None]  # prior box가 열 기준으로 정렬되도록
+def calculate_iou(gt_boxes,pr_boxes):
+    # 1. pivot bounding boxes
+    exp_gt_boxes = gt_boxes[:,None] # Ground truth box가 행 기준으로 정렬되도록
+    exp_pr_boxes = pr_boxes[None,:] # prior box가 열 기준으로 정렬되도록
 
-    # Calculate Intersection
-    gt_cx, gt_cy, gt_w, gt_h = np.split(exp_gt_boxes, 4, axis=-1)
-    pr_cx, pr_cy, pr_w, pr_h = np.split(exp_pr_boxes, 4, axis=-1)
+    # 2. calculate intersection over union
+    # 2.1. Calculate Intersection
+    gt_cx, gt_cy, gt_w, gt_h = exp_gt_boxes.transpose(2,0,1)
+    pr_cx, pr_cy, pr_w, pr_h = exp_pr_boxes.transpose(2,0,1)
 
-    gt_xmin, gt_xmax = gt_cx - gt_w / 2, gt_cx + gt_w / 2
-    gt_ymin, gt_ymax = gt_cy - gt_h / 2, gt_cy + gt_h / 2
-    pr_xmin, pr_xmax = pr_cx - pr_w / 2, pr_cx + pr_w / 2
-    pr_ymin, pr_ymax = pr_cy - pr_h / 2, pr_cy + pr_h / 2
+    # (cx,cy,w,h) -> (xmin,ymin,xmax,ymax)
+    gt_xmin, gt_xmax = gt_cx-gt_w/2, gt_cx+gt_w/2
+    gt_ymin, gt_ymax = gt_cy-gt_h/2, gt_cy+gt_h/2
+    pr_xmin, pr_xmax = pr_cx-pr_w/2, pr_cx+pr_w/2
+    pr_ymin, pr_ymax = pr_cy-pr_h/2, pr_cy+pr_h/2
 
+    # 겹친 사각형의 너비와 높이 구하기
     in_xmin = np.maximum(gt_xmin, pr_xmin)
     in_xmax = np.minimum(gt_xmax, pr_xmax)
     in_width = in_xmax - in_xmin
-    in_width[in_width < 0] = 0
+    in_width[in_width<0] = 0
 
     in_ymin = np.maximum(gt_ymin, pr_ymin)
     in_ymax = np.minimum(gt_ymax, pr_ymax)
     in_height = in_ymax - in_ymin
-    in_height[in_height < 0] = 0
+    in_height[in_height<0] = 0
 
-    intersection = in_width * in_height
-    intersection = np.squeeze(intersection, axis=-1)  # drop last dimension
+    # 겹친 사각형의 넓이 구하기
+    intersection = in_width*in_height
 
-    # Calculate Union
-    gt_sizes = exp_gt_boxes[..., 2] * exp_gt_boxes[..., 3]
-    pr_sizes = exp_pr_boxes[..., 2] * exp_pr_boxes[..., 3]
+    gt_sizes = exp_gt_boxes[...,2] * exp_gt_boxes[...,3]
+    pr_sizes = exp_pr_boxes[...,2] * exp_pr_boxes[...,3]
 
+    # 2.2. Calculate Union
     union = (gt_sizes + pr_sizes) - intersection
 
-    # Calculate Intersection Over Union
-    return (intersection / (union + 1e-5))
+    # 0 나누기 방지를 위함
+    return (intersection / (union+1e-5))
 
 
 def restore_position(predict_boxes, pr_boxes):
