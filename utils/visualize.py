@@ -11,7 +11,11 @@ def draw_rectangle(image, digits, color=(255,0,0), thickness=1):
     """ 주어진 좌표값 Dataframe에 따라, image에 사각형을 그리는 메소드
     """
     if isinstance(digits, np.ndarray):
-        digits = pd.DataFrame(digits,columns=['cx','cy','w','h'])
+        if digits.shape[1] == 4:
+            digits = pd.DataFrame(digits, columns=['cx','cy','w','h'])
+        elif digits.shape[2] == 5:
+            digits = pd.DataFrame(digits, columns=['cx', 'cy', 'w', 'h','label'])
+
     elif isinstance(digits, pd.DataFrame):
         pass
     else:

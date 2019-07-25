@@ -28,21 +28,26 @@ class PriorBoxes:
         (# Prior boxes, 4)로 이루어진 출력값 생성
         """
         height, width = image_shape[:2]
-        centers = []
-        for idx, row in self.bbox_df.iterrows():
-            stride, box_width, box_height = row.stride, row.w, row.h
-            ys, xs = np.mgrid[0:height:stride, 0:width:stride]
-            box_width = np.ones_like(xs) * box_width
-            box_height = np.ones_like(ys) * box_height
-            center_xs = stride // 2 + xs
-            center_ys = stride // 2 + ys
+        multi_boxes = []
+        for stride, df in self.bbox_df.groupby('stride'):
+            boxes = []
+            for idx, row in df.iterrows():
+                stride, box_width, box_height = row.stride, row.w, row.h
+                ys, xs = np.mgrid[0:height:stride, 0:width:stride]
+                box_width = np.ones_like(xs) * box_width
+                box_height = np.ones_like(ys) * box_height
+                center_xs = stride // 2 + xs
+                center_ys = stride // 2 + ys
 
-            block_centers = np.stack((center_xs, center_ys,
-                                      box_width, box_height),
-                                     axis=-1)
-            block_centers = block_centers.reshape(-1, 4)
-            centers.append(block_centers)
-        return np.concatenate(centers, axis=0)
+                block_centers = np.stack((center_xs, center_ys,
+                                          box_width, box_height),
+                                         axis=-1)
+                boxes.append(block_centers)
+            boxes = np.stack(boxes, axis=2)
+            boxes = np.reshape(boxes, (-1, 4))
+            multi_boxes.append(boxes)
+        multi_boxes = np.concatenate(multi_boxes, axis=0)
+        return multi_boxes
 
     def setup(self):
         bbox_df = pd.DataFrame(columns=['stride', 'w', 'h'])
@@ -160,3 +165,17 @@ def calculate_iou(gt_boxes, pr_boxes):
 
     # Calculate Intersection Over Union
     return (intersection / (union + 1e-5))
+
+
+def restore_position(predict_boxes, pr_boxes):
+    res_cx = (predict_boxes[:, 0]
+              * pr_boxes[:, 2]
+              + pr_boxes[:, 0])
+    res_cy = (predict_boxes[:, 1]
+              * pr_boxes[:, 3]
+              + pr_boxes[:, 1])
+    res_w = (np.exp(predict_boxes[:, 2])
+             * pr_boxes[:, 2])
+    res_h = (np.exp(predict_boxes[:, 3])
+             * pr_boxes[:, 3])
+    return np.stack([res_cx, res_cy, res_w, res_h], axis=-1)
