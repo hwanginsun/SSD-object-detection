@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from tensorflow.python.keras.utils import Sequence
 from tensorflow.python.keras.utils import to_categorical
+from utils.dataset import  DetectionDataset
 
 
 class PriorBoxes:
@@ -19,6 +20,11 @@ class PriorBoxes:
         self.scales = scales
         self.ratios = ratios
         self.setup()
+        self.config = {
+            "strides": self.strides,
+            "scales": self.scales,
+            "ratios": self.ratios
+        }
 
     def generate(self, image_shape):
         """
@@ -62,19 +68,36 @@ class PriorBoxes:
         bbox_df.h = bbox_df.h.astype(np.int)
         self.bbox_df = bbox_df
 
+    def get_config(self):
+        return self.config
+
 
 class DetectionGenerator(Sequence):
     'Generates Localization dataset for Keras'
-    def __init__(self, dataset, prior:PriorBoxes, batch_size=32,
-                 iou_threshold=0.5,
-                 shuffle=True):
+    def __init__(self, dataset:DetectionDataset, prior:PriorBoxes, batch_size=32,
+                 iou_threshold=0.5, best_match_policy=False, shuffle=True):
         'Initialization'
-        self.dataset = dataset
-        self.prior = prior
+        # Dictionary로 받았을 때에만 Multiprocessing이 동작가능함.
+        # Keras fit_generator에서 Multiprocessing으로 동작시키기 위함
+        if isinstance(dataset, dict):
+            self.dataset = DetectionDataset(**dataset)
+        elif isinstance(dataset, DetectionDataset):
+            self.dataset = dataset
+        else:
+            raise ValueError('dataset은 dict혹은 DetectionDataset Class로 이루어져 있어야 합니다.')
+
+        if isinstance(prior, dict):
+            self.prior = PriorBoxes(**prior)
+        elif isinstance(prior, PriorBoxes):
+            self.prior = prior
+        else:
+            raise ValueError('PriorBoxes은 dict 혹은 PriorBoxes Class로 이루어져 있어야 합니다.')
+
         self.batch_size = batch_size
         self.iou_threshold = iou_threshold
+        self.best_match_policy = best_match_policy
         self.shuffle = shuffle
-        self.num_classes = dataset.num_classes
+        self.num_classes = self.dataset.num_classes
         self.on_epoch_end()
 
     def __len__(self):
@@ -93,8 +116,10 @@ class DetectionGenerator(Sequence):
             gt_boxes = gt_df[['cx', 'cy', 'w', 'h']].values
             gt_labels = gt_df['label'].values
             iou = calculate_iou(gt_boxes, pr_boxes)
-
-            match_indices = np.argwhere(iou >= self.iou_threshold)
+            if self.best_match_policy:
+                match_indices = np.argwhere(iou >= self.iou_threshold)
+            else:
+                match_indices = np.argwhere(iou >= self.iou_threshold)
             gt_match_indices = match_indices[:, 0]
             pr_match_indices = match_indices[:, 1]
 
@@ -150,13 +175,11 @@ def calculate_iou(gt_boxes,pr_boxes):
     # 겹친 사각형의 너비와 높이 구하기
     in_xmin = np.maximum(gt_xmin, pr_xmin)
     in_xmax = np.minimum(gt_xmax, pr_xmax)
-    in_width = in_xmax - in_xmin
-    in_width[in_width<0] = 0
+    in_width = np.maximum(0, in_xmax - in_xmin)
 
     in_ymin = np.maximum(gt_ymin, pr_ymin)
     in_ymax = np.minimum(gt_ymax, pr_ymax)
-    in_height = in_ymax - in_ymin
-    in_height[in_height<0] = 0
+    in_height = np.maximum(0, in_ymax - in_ymin)
 
     # 겹친 사각형의 넓이 구하기
     intersection = in_width*in_height
