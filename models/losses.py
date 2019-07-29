@@ -6,12 +6,13 @@ import tensorflow as tf
 from tensorflow.python.keras import backend as K
 
 
-def SSDLoss(alpha=1., pos_neg_ratio=3., verbose=True):
+def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
     """
     Original Loss Function Using Hard Negative Sampling
 
     :param alpha:
     :param pos_neg_ratio:
+    :param ignore_match:
     :return:
     """
     def ssd_loss(y_true, y_pred):
@@ -26,6 +27,17 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., verbose=True):
 
         # split foreground & background
         neg_mask = y_true_clf[:, -1]
+        if ignore_match:
+            # ignore match의 경우
+            # y_true_clf[:, -1]의 값이 {0,1}이 아닌 다른 값으로 채워져 있음
+            # y_true_clf의 경우, 이후 softmax 계산할 때 값이 {0,1}사이에 매칭되지 않은 경우,
+            # NaN을 반환할 수 있어, y_true_clf 내 ignore match된 값들을 다시 1로 바꾸어줌
+            neg_mask = tf.where(neg_mask == 1,
+                                tf.ones_like(neg_mask),
+                                tf.zeros_like(neg_mask))
+            y_true_clf = tf.where(y_true_clf != 0,
+                                  tf.ones_like(y_true_clf),
+                                  tf.zeros_like(y_true_clf))
         pos_mask = 1 - neg_mask
         num_pos = tf.reduce_sum(pos_mask)
         num_neg = tf.reduce_sum(neg_mask)
@@ -52,8 +64,5 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., verbose=True):
         loc_loss = tf.reduce_sum(loc_loss * pos_mask) / (num_pos + eps)
 
         # total loss
-        if verbose:
-            clf_loss = K.print_tensor(clf_loss, message='clf_loss : ')
-            loc_loss = K.print_tensor(loc_loss, message='loc_loss : ')
         return clf_loss + alpha * loc_loss
     return ssd_loss

@@ -74,8 +74,8 @@ class PriorBoxes:
 
 class DetectionGenerator(Sequence):
     'Generates Localization dataset for Keras'
-    def __init__(self, dataset:DetectionDataset, prior:PriorBoxes, batch_size=32,
-                 iou_threshold=0.5, best_match_policy=False, shuffle=True):
+    def __init__(self, dataset:DetectionDataset, prior:PriorBoxes,
+                 batch_size=32, best_match_policy=False, shuffle=True):
         'Initialization'
         # Dictionary로 받았을 때에만 Multiprocessing이 동작가능함.
         # Keras fit_generator에서 Multiprocessing으로 동작시키기 위함
@@ -94,7 +94,6 @@ class DetectionGenerator(Sequence):
             raise ValueError('PriorBoxes은 dict 혹은 PriorBoxes Class로 이루어져 있어야 합니다.')
 
         self.batch_size = batch_size
-        self.iou_threshold = iou_threshold
         self.best_match_policy = best_match_policy
         self.shuffle = shuffle
         self.num_classes = self.dataset.num_classes
@@ -116,16 +115,17 @@ class DetectionGenerator(Sequence):
             gt_boxes = gt_df[['cx', 'cy', 'w', 'h']].values
             gt_labels = gt_df['label'].values
             iou = calculate_iou(gt_boxes, pr_boxes)
-            if self.best_match_policy:
-                match_indices = np.argwhere(iou >= self.iou_threshold)
-            else:
-                match_indices = np.argwhere(iou >= self.iou_threshold)
+
+            match_indices = np.argwhere(iou >= 0.5)
             gt_match_indices = match_indices[:, 0]
             pr_match_indices = match_indices[:, 1]
 
             # Background로 일단 채움
             y_true_clf = np.ones((pr_boxes.shape[0])) * self.num_classes
             y_true_clf[pr_match_indices] = gt_labels[gt_match_indices]
+            if self.best_match_policy:
+                ignore_indices = np.argwhere((iou < 0.5) & (iou >= 0.4))[:, 1]
+                y_true_clf[ignore_indices] = -1
 
             # classification One-Hot Encoding
             y_true_clf = to_categorical(y_true_clf,
