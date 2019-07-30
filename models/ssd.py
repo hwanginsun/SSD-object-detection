@@ -6,6 +6,7 @@ from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.layers import Conv2D
 from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.layers import Concatenate, Reshape
+from tensorflow.python.keras.layers import UpSampling2D
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Softmax
@@ -60,6 +61,30 @@ def build_base_network(input_shape=(None,None,3), num_units=16):
     outputs = norm5_2
 
     return Model(inputs, outputs, name='base_network')
+
+
+def remodel_fpn_network(base_network, source_layer_names, num_features=64):
+    upsampled = None
+
+    pyramid_outputs = []
+    num_layer = len(source_layer_names)
+    for idx, layer_name in enumerate(source_layer_names[::-1]):
+        source_layer = base_network.get_layer(layer_name).output
+
+        lateral = Conv2D(num_features, (1, 1), padding='same')(source_layer)
+        if upsampled is not None:
+            output = lateral + upsampled
+            upsampled = UpSampling2D((2, 2))(output)
+        else:
+            output = lateral
+            upsampled = UpSampling2D((2, 2))(lateral)
+        p_num = num_layer - idx
+        pyramid_output = Conv2D(num_features, (3, 3),
+                                padding='same', name=f'P{p_num}')(output)
+        pyramid_outputs.append(pyramid_output)
+
+    fpn_network = Model(base_network.input, pyramid_outputs)
+    return fpn_network
 
 
 def attach_multibox_head(network, source_layer_names,
