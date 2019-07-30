@@ -41,6 +41,8 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
             y_true_clf = tf.where(y_true_clf != 0,
                                   tf.ones_like(y_true_clf),
                                   tf.zeros_like(y_true_clf))
+        else:
+            pos_mask = 1 - neg_mask
         num_pos = tf.reduce_sum(pos_mask)
         num_neg = tf.reduce_sum(neg_mask)
         num_neg = tf.minimum(pos_neg_ratio * num_pos, num_neg)
