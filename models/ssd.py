@@ -2,14 +2,15 @@
 Copyright 2019, SangJae Kang, All rights reserved.
 Mail : rocketgrowthsj@gmail.com
 """
-from tensorflow.python.keras.layers import Input
+from tensorflow.python.keras.layers import Input, Layer
 from tensorflow.python.keras.layers import Conv2D
 from tensorflow.python.keras.layers import BatchNormalization
 from tensorflow.python.keras.layers import Concatenate, Reshape
 from tensorflow.python.keras.layers import UpSampling2D
 from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.layers import Softmax
+from tensorflow.python.keras.layers import Softmax, Add
+from tensorflow.python.keras.activations import sigmoid
 
 
 def build_base_network(input_shape=(None,None,3), num_units=16):
@@ -73,7 +74,7 @@ def remodel_fpn_network(base_network, source_layer_names, num_features=64):
 
         lateral = Conv2D(num_features, (1, 1), padding='same')(source_layer)
         if upsampled is not None:
-            output = lateral + upsampled
+            output = Add()([lateral, upsampled])
             upsampled = UpSampling2D((2, 2))(output)
         else:
             output = lateral
@@ -88,17 +89,22 @@ def remodel_fpn_network(base_network, source_layer_names, num_features=64):
 
 
 def attach_multibox_head(network, source_layer_names,
-                         num_priors=4, num_classes=10):
+                         num_priors=4, num_classes=10, activation='softmax'):
     heads = []
     for idx, layer_name in enumerate(source_layer_names):
         source_layer = network.get_layer(layer_name).output
 
         # Classification
-        clf = Conv2D(num_priors * (num_classes+1), (3, 3),
+        clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
-        clf = Reshape((-1, num_classes+1),
+        clf = Reshape((-1, num_classes),
                       name=f'clf_head{idx}_reshape')(clf)
-        clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
+        if activation == 'softmax':
+            clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
+        elif activation == 'sigmoid':
+            clf = sigmoid(clf)
+        else:
+            raise ValueError('activation은 {softmax,sigmoid}중에서 되어야 합니다.')
 
         # Localization
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
@@ -107,8 +113,10 @@ def attach_multibox_head(network, source_layer_names,
                       name=f'loc_head{idx}_reshape')(loc)
         head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
         heads.append(head)
+
     if len(heads) > 1:
         predictions = Concatenate(axis=1, name='predictions')(heads)
     else:
         predictions = K.identity(heads[0],name='predictions')
     return predictions
+

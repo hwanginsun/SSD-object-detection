@@ -26,23 +26,24 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
         y_pred_clf, y_pred_loc = tf.split(y_pred, [num_classes, 4], axis=-1)
 
         # split foreground & background
-        neg_mask = y_true_clf[:, -1]
+        mask = y_true_clf[:, -1]
         if ignore_match:
             # ignore match의 경우
             # y_true_clf[:, -1]의 값이 {0,1}이 아닌 다른 값으로 채워져 있음
             # y_true_clf의 경우, 이후 softmax 계산할 때 값이 {0,1}사이에 매칭되지 않은 경우,
             # NaN을 반환할 수 있어, y_true_clf 내 ignore match된 값들을 다시 1로 바꾸어줌
-            neg_mask = tf.where(tf.equal(neg_mask, 1.),
-                                tf.ones_like(neg_mask),
-                                tf.zeros_like(neg_mask))
-            pos_mask = tf.where(tf.equal(neg_mask, 0.),
-                                tf.ones_like(neg_mask),
-                                tf.zeros_like(neg_mask))
+            neg_mask = tf.where(tf.equal(mask, 1.),
+                                tf.ones_like(mask),
+                                tf.zeros_like(mask))
+            pos_mask = tf.where(tf.equal(mask, 0.),
+                                tf.ones_like(mask),
+                                tf.zeros_like(mask))
             y_true_clf = tf.where(tf.not_equal(y_true_clf, 0),
                                   tf.ones_like(y_true_clf),
                                   tf.zeros_like(y_true_clf))
         else:
-            pos_mask = 1 - neg_mask
+            neg_mask = mask
+            pos_mask = 1 - mask
         num_pos = tf.reduce_sum(pos_mask)
         num_neg = tf.reduce_sum(neg_mask)
         num_neg = tf.minimum(pos_neg_ratio * num_pos, num_neg)
@@ -69,4 +70,63 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
 
         # total loss
         return clf_loss + alpha * loc_loss
+    return ssd_loss
+
+
+def FocalLoss(alpha=.25, gamma=2.):
+    """
+    Focal Loss Function
+
+    :param alpha:
+    :param gamma:
+    :return:
+    """
+
+    def ssd_loss(y_true, y_pred):
+        num_classes = tf.shape(y_true)[2] - 4
+        y_true = tf.reshape(y_true, [-1, num_classes + 4])
+        y_pred = tf.reshape(y_pred, [-1, num_classes - 1 + 4])
+        eps = K.epsilon()
+
+        # Split Classification and Localization output
+        y_true_clf, y_true_loc = tf.split(y_true, [num_classes, 4], axis=-1)
+        y_pred_clf, y_pred_loc = tf.split(y_pred, [num_classes - 1, 4], axis=-1)
+
+        # split foreground & background
+        mask = y_true_clf[:, -1]
+        ignore_mask = tf.where(tf.equal(mask, -1.),
+                               tf.zeros_like(mask),
+                               tf.ones_like(mask))
+        neg_mask = tf.where(tf.equal(mask, 1.),
+                            tf.ones_like(mask),
+                            tf.zeros_like(mask))
+        pos_mask = tf.where(tf.equal(mask, 0.),
+                            tf.ones_like(mask),
+                            tf.zeros_like(mask))
+        y_true_clf = tf.where(tf.not_equal(y_true_clf, 0),
+                              tf.ones_like(y_true_clf),
+                              tf.zeros_like(y_true_clf))
+        num_pos = tf.reduce_sum(pos_mask)
+        num_neg = tf.reduce_sum(neg_mask)
+
+        # Focal Loss
+        y_pred_clf = K.clip(y_pred_clf, eps, 1. - eps)
+        pt = tf.where(tf.equal(y_true_clf[:, :num_classes - 1], 1.),
+                      y_pred_clf, 1. - y_pred_clf)
+        loss = -K.pow(1. - pt, gamma) * tf.log(pt)
+        clf_loss = tf.reduce_sum(alpha * loss, axis=-1)
+        clf_loss = tf.reduce_sum(ignore_mask * clf_loss) / (num_pos + num_neg + eps)
+
+        # smooth l1 loss
+        l1_loss = tf.abs(y_true_loc - y_pred_loc)
+        l2_loss = 0.5 * (y_true_loc - y_pred_loc) ** 2
+        loc_loss = tf.where(tf.less(l1_loss, 1.0),
+                            l2_loss,
+                            l1_loss - 0.5)
+        loc_loss = tf.reduce_mean(loc_loss, axis=-1)
+        loc_loss = tf.reduce_sum(loc_loss * pos_mask) / (num_pos + eps)
+
+        # total loss
+        return alpha * clf_loss + loc_loss
+
     return ssd_loss
