@@ -32,13 +32,15 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
             # y_true_clf[:, -1]의 값이 {0,1}이 아닌 다른 값으로 채워져 있음
             # y_true_clf의 경우, 이후 softmax 계산할 때 값이 {0,1}사이에 매칭되지 않은 경우,
             # NaN을 반환할 수 있어, y_true_clf 내 ignore match된 값들을 다시 1로 바꾸어줌
-            neg_mask = tf.where(neg_mask == 1,
+            neg_mask = tf.where(neg_mask == 1.,
+                                tf.ones_like(neg_mask),
+                                tf.zeros_like(neg_mask))
+            pos_mask = tf.where(neg_mask == 0.,
                                 tf.ones_like(neg_mask),
                                 tf.zeros_like(neg_mask))
             y_true_clf = tf.where(y_true_clf != 0,
                                   tf.ones_like(y_true_clf),
                                   tf.zeros_like(y_true_clf))
-        pos_mask = 1 - neg_mask
         num_pos = tf.reduce_sum(pos_mask)
         num_neg = tf.reduce_sum(neg_mask)
         num_neg = tf.minimum(pos_neg_ratio * num_pos, num_neg)
