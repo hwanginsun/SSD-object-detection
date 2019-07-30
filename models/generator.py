@@ -127,13 +127,13 @@ class DetectionGenerator(Sequence):
             # Background로 일단 채움
             y_true_clf = np.ones((pr_boxes.shape[0])) * self.num_classes
             y_true_clf[pr_match_indices] = gt_labels[gt_match_indices]
-            if self.best_match_policy:
-                ignore_indices = np.argwhere((iou < 0.5) & (iou >= 0.4))[:, 1]
-                y_true_clf[ignore_indices] = -1
 
             # classification One-Hot Encoding
             y_true_clf = to_categorical(y_true_clf,
                                         num_classes=self.num_classes + 1)
+            if self.best_match_policy:
+                ignore_indices = np.argwhere((iou < 0.5) & (iou >= 0.4))[:, 1]
+                y_true_clf[ignore_indices, -1] = -1
 
             # Positional Information Encoding
             y_true_loc = np.zeros((pr_boxes.shape[0], 4))
