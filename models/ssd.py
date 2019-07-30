@@ -62,11 +62,11 @@ def build_base_network(input_shape=(None,None,3), num_units=16):
     return Model(inputs, outputs, name='base_network')
 
 
-def attach_multibox_head(base_network, source_layer_names,
+def attach_multibox_head(network, source_layer_names,
                          num_priors=4, num_classes=10):
     heads = []
     for idx, layer_name in enumerate(source_layer_names):
-        source_layer = base_network.get_layer(layer_name).output
+        source_layer = network.get_layer(layer_name).output
 
         # Classification
         clf = Conv2D(num_priors * (num_classes+1), (3, 3),
