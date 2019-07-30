@@ -116,12 +116,11 @@ class DetectionGenerator(Sequence):
             gt_labels = gt_df['label'].values
             iou = calculate_iou(gt_boxes, pr_boxes)
 
+            match_indices = np.argwhere(iou >= 0.5)
             if self.best_match_policy:
                 best_indices = np.stack([np.arange(iou.shape[0]),
                                          np.argmax(iou, axis=1)], axis=1)
-                match_indices = np.argwhere(iou >= 0.5)
                 match_indices = np.concatenate([match_indices, best_indices])
-
             gt_match_indices = match_indices[:, 0]
             pr_match_indices = match_indices[:, 1]
 
