@@ -12,6 +12,7 @@ from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Softmax, Add
 from tensorflow.python.keras.activations import sigmoid
 
+import tensorflow as tf
 
 def build_base_network(input_shape=(128,128,3), num_units=16): # None,None,3 --> (128,128,3) --> (64,128,128,3) 안되네 ^^..
     inputs = Input(shape=input_shape)
@@ -108,7 +109,9 @@ def attach_multibox_head(network, source_layer_names,
         clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
         print("clf shape입니다 : ", clf.shape)
-        clf = Reshape((w*h*num_priors, num_classes), name=f'clf_head{idx}_reshape')(clf)  # (-1, num_classes) # w*h*num_priors
+        clf = tf.reshape(clf, shape=(-1, num_classes),
+                         name=f'clf_head{idx}_reshape')
+        # clf = Reshape((w*h*num_priors, num_classes), name=f'clf_head{idx}_reshape')(clf)  # (-1, num_classes) # w*h*num_priors
         print("clf의 reshape 후입니다 : ", clf.shape)
         if activation == 'softmax':
             clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
@@ -121,7 +124,9 @@ def attach_multibox_head(network, source_layer_names,
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
                      name=f'loc_head{idx}')(source_layer)
         print("loc의 shape입니다 : ", loc.shape)
-        loc = Reshape((w*h*num_priors, 4), name=f'loc_head{idx}_reshape')(loc)  #Reshape((-1, 4),
+        loc = tf.reshape(loc, shape=(-1, 4),
+                         name='loc_head{}_reshape'.format(idx))
+        # loc = Reshape((w*h*num_priors, 4), name=f'loc_head{idx}_reshape')(loc)  #Reshape((-1, 4),
         print("loc의 reshape 후입니다 : ", loc.shape)
         head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
         heads.append(head)
