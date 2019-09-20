@@ -13,7 +13,7 @@ from tensorflow.python.keras.layers import Softmax, Add
 from tensorflow.python.keras.activations import sigmoid
 
 
-def build_base_network(input_shape=(None,None,3), num_units=16):
+def build_base_network(input_shape=(128,128,3), num_units=16): # None,None,3
     inputs = Input(shape=input_shape)
 
     # BLOCK 1
