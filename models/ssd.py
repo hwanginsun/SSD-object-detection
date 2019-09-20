@@ -91,7 +91,7 @@ def remodel_fpn_network(base_network, source_layer_names, num_features=64):
 def attach_multibox_head(network, source_layer_names,
                          num_priors=4, num_classes=11, activation='softmax'): # 10->11
     heads = []
-    batch_size = 64 # OpenCV에서 인식을못해서 하드코딩한다 reshape를 인식못한다
+    # batch_size = 64 # OpenCV에서 인식을못해서 하드코딩한다 reshape를 인식못한다
     for idx, layer_name in enumerate(source_layer_names):
         source_layer = network.get_layer(layer_name).output
 
@@ -108,7 +108,7 @@ def attach_multibox_head(network, source_layer_names,
         clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
         print("clf shape입니다 : ", clf.shape)
-        clf = Reshape((-1, num_classes),
+        clf = Reshape((w*h*num_priors, num_classes),
                       name=f'clf_head{idx}_reshape')(clf)  # (-1, num_classes) # w*h*num_priors
         print("clf의 reshape 후입니다 : ", clf.shape)
         if activation == 'softmax':
