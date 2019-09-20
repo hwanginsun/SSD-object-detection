@@ -13,7 +13,7 @@ from tensorflow.python.keras.layers import Softmax, Add
 from tensorflow.python.keras.activations import sigmoid
 
 
-def build_base_network(input_shape=(64, 128,128,3), num_units=16): # None,None,3 --> (128,128,3) --> (64,128,128,3)
+def build_base_network(input_shape=(128,128,3), num_units=16): # None,None,3 --> (128,128,3) --> (64,128,128,3) 안되네 ^^..
     inputs = Input(shape=input_shape)
 
     # BLOCK 1
@@ -91,7 +91,7 @@ def remodel_fpn_network(base_network, source_layer_names, num_features=64):
 def attach_multibox_head(network, source_layer_names,
                          num_priors=4, num_classes=11, activation='softmax'): # 10->11
     heads = []
-    batch_size = 64 # OpenCV에서 인식을못해서 하드코딩한다 reshape를 인식못한다
+    # batch_size = 64 # OpenCV에서 인식을못해서 하드코딩한다 reshape를 인식못한다
     for idx, layer_name in enumerate(source_layer_names):
         source_layer = network.get_layer(layer_name).output
 
@@ -108,7 +108,7 @@ def attach_multibox_head(network, source_layer_names,
         clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
         print("clf shape입니다 : ", clf.shape)
-        clf = Reshape((batch_size, w*h*num_priors, num_classes), name=f'clf_head{idx}_reshape')(clf)  # (-1, num_classes) # w*h*num_priors
+        clf = Reshape((w*h*num_priors, num_classes), name=f'clf_head{idx}_reshape')(clf)  # (-1, num_classes) # w*h*num_priors
         print("clf의 reshape 후입니다 : ", clf.shape)
         if activation == 'softmax':
             clf = Softmax(axis=-1, name=f'clf_head{idx}')(clf)
@@ -121,7 +121,7 @@ def attach_multibox_head(network, source_layer_names,
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
                      name=f'loc_head{idx}')(source_layer)
         print("loc의 shape입니다 : ", loc.shape)
-        loc = Reshape((batch_size, w*h*num_priors, 4), name=f'loc_head{idx}_reshape')(loc)  #Reshape((-1, 4),
+        loc = Reshape((w*h*num_priors, 4), name=f'loc_head{idx}_reshape')(loc)  #Reshape((-1, 4),
         print("loc의 reshape 후입니다 : ", loc.shape)
         head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
         heads.append(head)
