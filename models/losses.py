@@ -16,7 +16,7 @@ def SSDLoss(alpha=1., pos_neg_ratio=3., ignore_match=False):
     :return:
     """
     def ssd_loss(y_true, y_pred):
-        num_classes = tf.shape(y_true)[2] - 4
+        num_classes = 11 # tf.shape(y_true)[2] - 4 # openCV에서 동적 shape를 지원안함.
         y_true = tf.reshape(y_true, [-1, num_classes + 4])
         y_pred = tf.reshape(y_pred, [-1, num_classes + 4])
         eps = K.epsilon()
@@ -83,7 +83,7 @@ def FocalLoss(alpha=.25, gamma=2.):
     """
 
     def ssd_loss(y_true, y_pred): #ssd_loss
-        num_classes = tf.shape(y_true)[2] - 4
+        num_classes = 11 # tf.shape(y_true)[2] - 4 # openCV에서 동적 shape를 지원안함.
         y_true = tf.reshape(y_true, [-1, num_classes + 4])
         y_pred = tf.reshape(y_pred, [-1, num_classes - 1 + 4])
         eps = K.epsilon()
