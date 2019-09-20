@@ -99,11 +99,14 @@ def attach_multibox_head(network, source_layer_names,
         # "Can't create layer \"loc_head2_reshape_2/Shape\" of type \"Shape\""
         # 조치 : class개수를 10에서 11로 바꿔줌
 
+        w = source_layer.shape[1]
+        h = source_layer.shape[2]
+
         # Classification
         clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
         print("clf shape입니다 : ", clf.shape)
-        clf = Reshape((batch_size, -1, num_classes), # (-1, num_classes)
+        clf = Reshape((batch_size, w*h*num_priors, num_classes), # (-1, num_classes)
                       name=f'clf_head{idx}_reshape')(clf)
         print("clf의 reshape 후입니다 : ", clf.shape)
         if activation == 'softmax':
@@ -117,7 +120,7 @@ def attach_multibox_head(network, source_layer_names,
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
                      name=f'loc_head{idx}')(source_layer)
         print("loc의 shape입니다 : ", loc.shape)
-        loc = Reshape((batch_size, -1, 4), #Reshape((-1, 4),
+        loc = Reshape((batch_size, w*h*num_priors, 4), #Reshape((-1, 4),
                       name=f'loc_head{idx}_reshape')(loc)
         print("loc의 reshape 후입니다 : ", loc.shape)
         head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
