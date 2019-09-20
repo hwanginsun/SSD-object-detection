@@ -89,10 +89,14 @@ def remodel_fpn_network(base_network, source_layer_names, num_features=64):
 
 
 def attach_multibox_head(network, source_layer_names,
-                         num_priors=4, num_classes=10, activation='softmax'):
+                         num_priors=4, num_classes=11, activation='softmax'): # 10->11
     heads = []
     for idx, layer_name in enumerate(source_layer_names):
         source_layer = network.get_layer(layer_name).output
+
+        # OpenCV Loading Error
+        # "Can't create layer \"loc_head2_reshape_2/Shape\" of type \"Shape\""
+        # 조치 : class개수를 10에서 11로 바꿔줌
 
         # Classification
         clf = Conv2D(num_priors * num_classes, (3, 3),
@@ -109,7 +113,8 @@ def attach_multibox_head(network, source_layer_names,
         # Localization
         loc = Conv2D(num_priors * 4, (3,3), padding='same',
                      name=f'loc_head{idx}')(source_layer)
-        loc = Reshape((-1,4),
+        print("loc의 shape입니다 : ", loc.shape)
+        loc = Reshape((-1, 4),
                       name=f'loc_head{idx}_reshape')(loc)
         head = Concatenate(axis=-1, name=f'head{idx}')([clf, loc])
         heads.append(head)
