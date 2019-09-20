@@ -99,8 +99,8 @@ def attach_multibox_head(network, source_layer_names,
         # "Can't create layer \"loc_head2_reshape_2/Shape\" of type \"Shape\""
         # 조치 : class개수를 10에서 11로 바꿔줌
 
-        w = source_layer.shape[1]
-        h = source_layer.shape[2]
+        w = source_layer.get_shape().as_list()[1]
+        h = source_layer.get_shape().as_list()[2]
 
         # Classification
         clf = Conv2D(num_priors * num_classes, (3, 3),
