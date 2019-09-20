@@ -101,7 +101,9 @@ def attach_multibox_head(network, source_layer_names,
 
         w = source_layer.get_shape().as_list()[1]
         h = source_layer.get_shape().as_list()[2]
-
+        print("w : ", w)
+        print("h : ", h)
+        print("num_priors : ", num_priors)
         # Classification
         clf = Conv2D(num_priors * num_classes, (3, 3),
                      padding='same', name=f'clf_head{idx}_logit')(source_layer)
